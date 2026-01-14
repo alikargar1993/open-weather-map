@@ -1,33 +1,44 @@
-import axios from 'axios';
-import { weatherApi } from '../weatherApi';
-import { CurrentWeather, ForecastResponse } from '../weatherApi';
+import type { CurrentWeather, ForecastResponse } from '../weatherApi';
 
-// Mock axios
-jest.mock('axios');
-const mockedAxios = axios as jest.Mocked<typeof axios>;
+// Create a mock axios instance that will be reused
+// The interceptors need to actually store the functions
+let requestInterceptor: ((config: any) => any) | null = null;
+let responseInterceptorFulfilled: ((response: any) => any) | null = null;
+let responseInterceptorRejected: ((error: any) => any) | null = null;
+
+const mockAxiosInstance = {
+  get: jest.fn(),
+  interceptors: {
+    request: {
+      use: jest.fn((fulfilled?: any, rejected?: any) => {
+        requestInterceptor = fulfilled;
+        return 0; // Return interceptor ID
+      }),
+    },
+    response: {
+      use: jest.fn((fulfilled?: any, rejected?: any) => {
+        responseInterceptorFulfilled = fulfilled;
+        responseInterceptorRejected = rejected;
+        return 0; // Return interceptor ID
+      }),
+    },
+  },
+};
+
+// Mock axios with factory function
+jest.mock('axios', () => {
+  const actualAxios = jest.requireActual('axios');
+  return {
+    ...actualAxios,
+    create: jest.fn(() => mockAxiosInstance),
+  };
+});
 
 describe('WeatherApiService', () => {
-  let mockAxiosInstance: any;
-
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.resetModules();
     process.env.EXPO_PUBLIC_WEATHER_API_KEY = 'test-api-key';
-
-    // Create a mock axios instance
-    mockAxiosInstance = {
-      get: jest.fn(),
-      interceptors: {
-        request: {
-          use: jest.fn(),
-        },
-        response: {
-          use: jest.fn(),
-        },
-      },
-    };
-
-    // Mock axios.create to return our mock instance
-    (axios.create as jest.Mock).mockReturnValue(mockAxiosInstance);
   });
 
   afterEach(() => {
@@ -72,10 +83,23 @@ describe('WeatherApiService', () => {
         cod: 200,
       };
 
-      mockAxiosInstance.get.mockResolvedValue({ data: mockWeather });
+      // Setup mock to call interceptors
+      mockAxiosInstance.get.mockImplementation(async (url: string) => {
+        // Apply request interceptor if exists
+        let config = { url };
+        if (requestInterceptor) {
+          config = requestInterceptor(config) || config;
+        }
+        // Simulate successful response
+        const response = { data: mockWeather };
+        // Apply response interceptor if exists
+        if (responseInterceptorFulfilled) {
+          return responseInterceptorFulfilled(response);
+        }
+        return response;
+      });
 
       // Re-import to get fresh instance with mocked axios
-      jest.resetModules();
       const { weatherApi: freshWeatherApi } = require('../weatherApi');
       const result = await freshWeatherApi.getCurrentWeatherByCity('New York');
 
@@ -88,19 +112,16 @@ describe('WeatherApiService', () => {
     it('should throw error when API key is missing', async () => {
       delete process.env.EXPO_PUBLIC_WEATHER_API_KEY;
 
-      // Re-import to get fresh instance
-      jest.resetModules();
+      // Re-import to get fresh instance (this will set up interceptors)
       const { weatherApi: freshWeatherApi } = require('../weatherApi');
 
-      // Mock the request interceptor to throw error
-      const requestInterceptor = mockAxiosInstance.interceptors.request.use;
-      requestInterceptor.mockImplementation((onFulfilled: any) => {
-        if (!process.env.EXPO_PUBLIC_WEATHER_API_KEY) {
-          throw new Error(
-            'OpenWeatherMap API key is not configured. Please set EXPO_PUBLIC_WEATHER_API_KEY in your .env file'
-          );
+      // Setup mock to call request interceptor
+      mockAxiosInstance.get.mockImplementation(async (url: string) => {
+        // Apply request interceptor - it should throw if API key is missing
+        if (requestInterceptor) {
+          requestInterceptor({ url });
         }
-        return onFulfilled({});
+        return { data: {} };
       });
 
       await expect(
@@ -119,17 +140,21 @@ describe('WeatherApiService', () => {
         },
       };
 
-      mockAxiosInstance.get.mockRejectedValue(mockError);
-
-      // Mock response interceptor to handle error
-      const responseInterceptor = mockAxiosInstance.interceptors.response.use;
-      responseInterceptor.mockImplementation(
-        (onFulfilled: any, onRejected: any) => {
-          return onRejected(mockError);
+      // Setup mock to reject and call response interceptor
+      mockAxiosInstance.get.mockImplementation(async (url: string) => {
+        // Apply request interceptor if exists
+        if (requestInterceptor) {
+          requestInterceptor({ url });
         }
-      );
+        // Simulate error
+        const error = mockError;
+        // Apply response interceptor error handler if exists
+        if (responseInterceptorRejected) {
+          return Promise.reject(responseInterceptorRejected(error));
+        }
+        return Promise.reject(error);
+      });
 
-      jest.resetModules();
       const { weatherApi: freshWeatherApi } = require('../weatherApi');
 
       await expect(
@@ -169,9 +194,18 @@ describe('WeatherApiService', () => {
         cod: 200,
       };
 
-      mockAxiosInstance.get.mockResolvedValue({ data: mockWeather });
+      // Setup mock to call interceptors
+      mockAxiosInstance.get.mockImplementation(async (url: string) => {
+        if (requestInterceptor) {
+          requestInterceptor({ url });
+        }
+        const response = { data: mockWeather };
+        if (responseInterceptorFulfilled) {
+          return responseInterceptorFulfilled(response);
+        }
+        return response;
+      });
 
-      jest.resetModules();
       const { weatherApi: freshWeatherApi } = require('../weatherApi');
       const result = await freshWeatherApi.getCurrentWeatherByCoords(40.7128, -74.006);
 
@@ -201,9 +235,18 @@ describe('WeatherApiService', () => {
         },
       };
 
-      mockAxiosInstance.get.mockResolvedValue({ data: mockForecast });
+      // Setup mock to call interceptors
+      mockAxiosInstance.get.mockImplementation(async (url: string) => {
+        if (requestInterceptor) {
+          requestInterceptor({ url });
+        }
+        const response = { data: mockForecast };
+        if (responseInterceptorFulfilled) {
+          return responseInterceptorFulfilled(response);
+        }
+        return response;
+      });
 
-      jest.resetModules();
       const { weatherApi: freshWeatherApi } = require('../weatherApi');
       const result = await freshWeatherApi.getForecastByCity('New York');
 

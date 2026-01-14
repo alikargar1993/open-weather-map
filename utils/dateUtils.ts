@@ -38,7 +38,7 @@ export const formatLastUpdated = (timestamp: number | null): string => {
     return `${diffMins}m ago`;
   } else {
     const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) {
+    if (diffHours <= 24) {
       return `${diffHours}h ago`;
     } else {
       return date.toLocaleString("en-US", {

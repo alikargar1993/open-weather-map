@@ -38,6 +38,7 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     // Load cached data first
@@ -57,11 +58,18 @@ export default function HomeScreen() {
     return () => clearInterval(timer);
   }, [dispatch]);
 
-  const handleRefresh = () => {
-    if (currentWeather) {
-      dispatch(fetchWeatherByCity(currentWeather.name));
-    } else {
-      dispatch(fetchWeatherByLocation());
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      if (currentWeather) {
+        await dispatch(fetchWeatherByCity(currentWeather.name));
+      } else {
+        await dispatch(fetchWeatherByLocation());
+      }
+    } catch (error) {
+      console.error("Refresh error:", error);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -75,7 +83,7 @@ export default function HomeScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={handleRefresh} />
+          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
         }
       >
         <Animated.View entering={FadeInDown.duration(600)}>

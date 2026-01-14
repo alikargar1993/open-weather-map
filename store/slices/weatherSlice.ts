@@ -1,8 +1,7 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { weatherApi } from '@/services/weatherApi';
 import { locationService } from '@/services/locationService';
-import { WeatherState, DailyForecast, HourlyForecast } from '@/types/weather';
-import { CurrentWeather, ForecastItem } from '@/services/weatherApi';
+import { CurrentWeather, ForecastItem, weatherApi } from '@/services/weatherApi';
+import { DailyForecast, WeatherState } from '@/types/weather';
+import { createAsyncThunk, createSelector, createSlice } from '@reduxjs/toolkit';
 import { storage } from '../persistence';
 
 const CACHE_KEY = 'weather_cache';
@@ -248,9 +247,10 @@ export const { clearError } = weatherSlice.actions;
 export const selectCurrentWeather = (state: { weather: WeatherState }) => state.weather.currentWeather;
 export const selectForecast = (state: { weather: WeatherState }) => state.weather.forecast;
 export const selectHourlyForecast = (state: { weather: WeatherState }) => state.weather.hourlyForecast;
-export const selectDailyForecast = (state: { weather: WeatherState }): DailyForecast[] => {
-  return processDailyForecast(state.weather.forecast);
-};
+export const selectDailyForecast = createSelector(
+  [selectForecast],
+  (forecast): DailyForecast[] => processDailyForecast(forecast)
+);
 export const selectLoading = (state: { weather: WeatherState }) => state.weather.loading;
 export const selectError = (state: { weather: WeatherState }) => state.weather.error;
 export const selectCurrentCity = (state: { weather: WeatherState }) => state.weather.currentCity;

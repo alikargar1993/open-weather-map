@@ -87,7 +87,7 @@ The app uses **Expo Router** for file-based routing, providing a native navigati
 
 ### Prerequisites
 
-- Node.js 18+ installed
+- Node.js >= 20.19.4 installed
 - Yarn package manager (or npm)
 - Expo CLI (`npm install -g expo-cli` or use `npx expo`)
 - OpenWeatherMap API key (free tier available at https://openweathermap.org/api)

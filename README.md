@@ -313,6 +313,11 @@ This app uses the OpenWeatherMap Free Tier API:
 
 This project is private and proprietary.
 
+## TODO
+
+- Improve API request logic, using "react-query" instead of "axios"
+- Add new page to see the list of searched cities
+
 ## Learn more
 
 - [Expo documentation](https://docs.expo.dev/)
